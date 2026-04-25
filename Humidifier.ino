@@ -33,6 +33,10 @@ volatile unsigned char *ddr_b = (unsigned char *) 0x24;
 volatile unsigned char *port_b =    (unsigned char *) 0x25;
 
 int state = 2;
+int uInput = 40;
+int on_count = 1;
+
+DHT11 dht11(28);
 
 void setup() {
 
@@ -65,7 +69,6 @@ void loop() {
   }
 
   if (state == 2){
-    Serial.println("on");
     On();
   }
 
@@ -103,6 +106,9 @@ void Idle(){
   //Read and update user input
 
   //Check humidity sensor
+  if (dht11.readHumidity() < uInput){
+    state = 2;
+  }
   
 }
 
@@ -115,15 +121,21 @@ void On(){
   
 
   //Turn on humidifier
-  //NOT OPERATING
-  *port_a |= 0b00000100;
-  delayMicroseconds(1);
-  *port_a &= ~0b00000100;
-  delayMicroseconds(1);
 
+
+  if (on_count == 1){
+  *port_a |= 0b00000100;
+  delay(50);
+  *port_a &= ~0b00000100;
+  on_count = 0;
+  }
+Serial.println(dht11.readHumidity());
   //Read and update user input
 
   //Check humidity sensor
+  if (dht11.readHumidity() > (uInput + 5)){
+    state = 1;
+  }
 }
 
 void Error(int code){
