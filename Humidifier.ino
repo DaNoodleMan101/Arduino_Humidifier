@@ -6,6 +6,9 @@
 
 
 #include <DHT11.h> //DHT11 Humidity Sensor Library by Dhruba Saha
+#include <RTClib.h> // RTC library by Adafruit
+#include <LiquidCrystal.h>
+
 
 
 
@@ -25,6 +28,12 @@ volatile unsigned char *myTIFR1 =  (unsigned char *) 0x36;
  volatile unsigned int  *myUBRR0  = (unsigned int *) 0x00C4;
  volatile unsigned char *myUDR0   = (unsigned char *)0x00C6;
 
+ 
+volatile unsigned char* my_ADMUX = (unsigned char*) 0x7C;
+volatile unsigned char* my_ADCSRB = (unsigned char*) 0x7B;
+volatile unsigned char* my_ADCSRA = (unsigned char*) 0x7A;
+volatile unsigned int* my_ADC_DATA = (unsigned int*) 0x78;
+
 
 volatile unsigned char* ddr_a = (unsigned char*) 0x21;
 volatile unsigned char* port_a = (unsigned char*) 0x22;
@@ -32,43 +41,69 @@ volatile unsigned char* pin_a = (unsigned char*) 0x20;
 volatile unsigned char *ddr_b = (unsigned char *) 0x24;
 volatile unsigned char *port_b =    (unsigned char *) 0x25;
 
-int state = 2;
-int uInput = 40;
-int on_count = 1;
+int state = 0;
+unsigned int uInput = 0;
+bool humid_power = false;
+int powerButton = 19;
 
 DHT11 dht11(28);
+
+RTC_DS3231 rtc;
+
+const int RS = 30, EN = 31, D4 = 35, D5 = 36, D6 = 37, D7 = 38;
+LiquidCrystal lcd(RS, EN, D4, D5, D6, D7);
 
 void setup() {
 
   Serial.begin(9600);
+
+  rtc.begin();
+
+  // set up the LCD's number of columns and rows:
+  lcd.begin(16, 2);
+  attachInterrupt(digitalPinToInterrupt(powerButton), power, RISING);
+  
+  // setup the ADC
+  //adc_init();
   
 
 // Set Led to output
 *ddr_a |=  0b00111000;
 // Set humidifier to output
 *ddr_a |=  0b00000100;
+*port_a |= 0b00000100;
 // Set humidity sensor as input
 *ddr_a &= ~0b01000000;
 *port_a &= ~0b01000000;
+
+*port_a |= 0b00000100;
 
 }
 
 
 void loop() {
-  
-  
+  uInput = analogRead(0);
+  //uInput = adc_read(0);
+  uInput = map(uInput, 0, 1023, 0, 100);
+  date();
+  Serial.print("User Input: ");
+  Serial.println(uInput);
 
   if (state == 0){
-    Serial.println("off");
+    date();
+    Serial.println("Off State");
     Off();
   }
 
   if (state == 1){
-    Serial.println("idle");
+    date();
+    Serial.println("Idle State");
     Idle();
   }
 
   if (state == 2){
+    date();
+    Serial.println("On State");
     On();
   }
 
@@ -83,13 +118,32 @@ void loop() {
 
 }
 
+void power(){
+  state = 1;
+  }
+
+void date(){
+  DateTime now = rtc.now();
+  Serial.print(now.month(), DEC);
+  Serial.print("/");
+  Serial.print(now.day(), DEC);
+  Serial.print("/");
+  Serial.print(now.year(), DEC);
+  Serial.print(" ");
+  Serial.print(now.hour(), DEC);
+  Serial.print(":");
+  Serial.print(now.minute(), DEC);
+  Serial.print(":");
+  Serial.print(now.second(), DEC);
+  Serial.print(" -- ");
+}
+
 void Off(){
   //Turn light to red
   *port_a |=  0b00001000;
   *port_a &= ~0b00110000;
 
-  delay(5000);
-  state += 1;
+  
 
 }
 
@@ -98,15 +152,38 @@ void Idle(){
   *port_a |=  0b00100000;
   *port_a &= ~0b00011000;
 
+
   delay(5000);
   state += 1;
 
   //Turn off humidifier
 
+  if (humid_power == true){
+  *port_a |= 0b00000100;
+  delay(100);
+  *port_a &= ~0b00000100;
+  delay(100);
+  *port_a |= 0b00000100;
+  delay(100);
+  *port_a &= ~0b00000100;
+  
+  humid_power = false;
+  }
+  
   //Read and update user input
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Humidity: ");
+  lcd.print(uInput);
+  lcd.print("%");
+  
 
   //Check humidity sensor
-  if (dht11.readHumidity() < uInput){
+  date();
+  Serial.print("Humidity: ");
+  Serial.println(dht11.readHumidity());
+  
+  if (dht11.readHumidity() < (uInput)){
     state = 2;
   }
   
@@ -123,16 +200,25 @@ void On(){
   //Turn on humidifier
 
 
-  if (on_count == 1){
+  if (humid_power == false){
   *port_a |= 0b00000100;
-  delay(50);
+  
+  delay(500);
   *port_a &= ~0b00000100;
-  on_count = 0;
+  humid_power = true;
   }
-Serial.println(dht11.readHumidity());
+  date();
+  Serial.print("Humidity: ");
+  Serial.println(dht11.readHumidity());
   //Read and update user input
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Humidity: ");
+  lcd.print(uInput);
+  lcd.print("%");
 
   //Check humidity sensor
+  
   if (dht11.readHumidity() > (uInput + 5)){
     state = 1;
   }
@@ -226,4 +312,76 @@ void U0putchar(unsigned char U0pdata)
 {
   while((*myUCSR0A & TBE) == 0);
   *myUDR0 = U0pdata;
+}
+
+void adc_init() //write your code after each commented line and follow the instruction 
+{
+  // setup the A register
+ // set bit 7 to 1 to enable the ADC 
+ *my_ADCSRA |= 0b10000000;
+
+ // clear bit 5 to 0 to disable the ADC trigger mode
+
+*my_ADCSRA &= 0b11011111;
+
+ // clear bit 3 to 0 to disable the ADC interrupt 
+
+ *my_ADCSRA &= 0b11110111;
+
+ // clear bit 0-2 to 0 to set prescaler selection to slow reading
+
+ *my_ADCSRA &= 0b11111000;
+
+  // setup the B register
+// clear bit 3 to 0 to reset the channel and gain bits
+
+*my_ADCSRB &= 0b11110111;
+
+ // clear bit 2-0 to 0 to set free running mode
+
+ *my_ADCSRB &= 0b11111000;
+
+  // setup the MUX Register
+ // clear bit 7 to 0 for AVCC analog reference
+
+ *my_ADMUX &= 0b01111111;
+
+// set bit 6 to 1 for AVCC analog reference
+
+*my_ADMUX |= 0b01000000;
+
+  // clear bit 5 to 0 for right adjust result
+
+  *my_ADMUX &= 0b11011111;
+
+ // clear bit 4-0 to 0 to reset the channel and gain bits
+
+ *my_ADMUX &= 0b11100000;
+
+}
+unsigned int adc_read(unsigned char adc_channel_num) //work with channel 0
+{
+  // clear the channel selection bits (MUX 4:0)
+ 
+ *my_ADMUX &= 0b11100000;
+
+  // clear the channel selection bits (MUX 5) hint: it's not in the ADMUX register
+
+*my_ADCSRB &= 0b11110111;
+ 
+  // set the channel selection bits for channel 0
+
+  
+ *my_ADMUX &= 0b11110000;
+
+  // set bit 6 of ADCSRA to 1 to start a conversion
+
+  *my_ADCSRA |= 0b01000000; 
+
+  // wait for the conversion to complete
+  while((*my_ADCSRA & 0x40) != 0);
+  // return the result in the ADC data register and format the data based on right justification (check the lecture slide)
+  
+  unsigned int val = (*my_ADC_DATA & 0x03FF);
+  return val;
 }
