@@ -1,0 +1,5 @@
+(sym_lib_table
+	(version 7)
+	(lib (name "humidifier") (type "KiCad") (uri "${KIPRJMOD}/humidifier.kicad_sym") (options "") (descr ""))
+	(lib (name "humid") (type "KiCad") (uri "C:/Users/footb/OneDrive/Desktop/School Files/Sp 26/CPE_301/Humidifier/humid.kicad_sym") (options "") (descr ""))
+)
