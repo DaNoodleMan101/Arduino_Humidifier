@@ -1,6 +1,11 @@
 //Garrett McSweeney
 //Kevin Valadez Marquez
 
+//CPE 301.1001
+
+//This code controls a humidifier using a usier inputted humidity level as reference
+// Circuit and documentation are posted on github
+
 
 
 
@@ -47,8 +52,12 @@ volatile unsigned char* pin_e = (unsigned char*) 0x2C;
 int state = 0;
 unsigned int uInput = 0;
 bool humid_power = false;
-unsigned long previousMillis = 0;
+
 int code = 0;
+int errorInit = 0;
+unsigned long PMillis = 0;
+int blinkCount = 0;
+bool ledState = 0;
 
 DHT11 dht11(28);
 
@@ -61,7 +70,7 @@ LiquidCrystal lcd(RS, EN, D4, D5, D6, D7);
 
 void setup() {
 
-  Serial.begin(9600);
+  U0init(9600);
 
   rtc.begin();
 
@@ -143,7 +152,9 @@ void power(){
 
 void date(){
   DateTime now = rtc.now();
-  Serial.print(now.month(), DEC);
+  
+  
+  Serial.print(now.month());
   Serial.print("/");
   Serial.print(now.day(), DEC);
   Serial.print("/");
@@ -182,8 +193,6 @@ void Idle(){
 
 
   //Turn off humidifier
-
- 
   *port_a |= 0b00000100;
   
   
@@ -205,7 +214,7 @@ void Idle(){
   }
 
   //Error Checking
-  if (dht11.readHumidity() >= 100){code = 1;state = 3;} // Error 1: Humidity Sensor not Functioning
+  if (dht11.readHumidity() >= 100){code = 1;state = 3;errorInit = 1;} // Error 1: Humidity Sensor not Functioning
   
 }
 
@@ -241,14 +250,41 @@ void On(){
   }
 
   //Error Checking
-  if (dht11.readHumidity() >= 100){code = 1;state = 3;} // Error 1: Humidity Sensor not Functioning
+  if (dht11.readHumidity() >= 100){code = 1;state = 3;errorInit = 1;} // Error 1: Humidity Sensor not Functioning
 }
 
 void Error(int code){
   //Turn light to blinking red
+  if (errorInit == 1){
+    PMillis = millis();
+    ledState = LOW;
+    errorInit = 0;
+ 
+  }
+  unsigned long CMillis = millis();
+  if (CMillis - PMillis >= 350) {
+    PMillis = CMillis; // Save the last time you blinked
+    // Toggle the LED state
+    if (ledState == LOW) {
+        ledState = HIGH;
+        *port_a |=  0b00001000;
+        *port_a &= ~0b00110000;
+    } 
+    else {
+      ledState = LOW;
+      *port_a &= ~0b00111000;
+      blinkCount++; // Increment count only after a full ON/OFF cycle
+    }
+
+      
+  }
   
-  *port_a |=  0b00001000;
-  *port_a &= ~0b00110000;
+
+    
+  
+
+  //Turn off humidifier
+  *port_a |= 0b00000100;
 
   if (code == 1){lcd.clear();lcd.print("E01");date();Serial.println("E01: Humidity Sensor not Functioning");}
 
@@ -256,7 +292,7 @@ void Error(int code){
 
   
     
-  }
+}
   
 void U0init(unsigned long U0baud)
 {
