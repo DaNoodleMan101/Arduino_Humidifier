@@ -40,11 +40,15 @@ volatile unsigned char* port_a = (unsigned char*) 0x22;
 volatile unsigned char* pin_a = (unsigned char*) 0x20;
 volatile unsigned char *ddr_b = (unsigned char *) 0x24;
 volatile unsigned char *port_b =    (unsigned char *) 0x25;
+volatile unsigned char* ddr_e = (unsigned char*) 0x2D;
+volatile unsigned char* port_e = (unsigned char*) 0x2E;
+volatile unsigned char* pin_e = (unsigned char*) 0x2C;
 
 int state = 0;
 unsigned int uInput = 0;
 bool humid_power = false;
-int powerButton = 19;
+unsigned long previousMillis = 0;
+int code = 0;
 
 DHT11 dht11(28);
 
@@ -52,6 +56,8 @@ RTC_DS3231 rtc;
 
 const int RS = 30, EN = 31, D4 = 35, D5 = 36, D6 = 37, D7 = 38;
 LiquidCrystal lcd(RS, EN, D4, D5, D6, D7);
+
+
 
 void setup() {
 
@@ -61,22 +67,34 @@ void setup() {
 
   // set up the LCD's number of columns and rows:
   lcd.begin(16, 2);
-  attachInterrupt(digitalPinToInterrupt(powerButton), power, RISING);
+
+
+  //power button interrupt
+  *ddr_e |= 0b00010000;
+  *port_e &= ~0b00010000;
+  attachInterrupt(digitalPinToInterrupt(2), power, RISING);
   
   // setup the ADC
   //adc_init();
   
 
-// Set Led to output
-*ddr_a |=  0b00111000;
-// Set humidifier to output
-*ddr_a |=  0b00000100;
-*port_a |= 0b00000100;
-// Set humidity sensor as input
-*ddr_a &= ~0b01000000;
-*port_a &= ~0b01000000;
+  // Set Led to output
+  *ddr_a |=  0b00111000;
+  // Set humidifier to output
+  *ddr_a |=  0b00000100;
+  *port_a |= 0b00000100;
+  // Set humidity sensor as input
+  *ddr_a &= ~0b01000000;
+  *port_a &= ~0b01000000;
+  // Set reset button as input
+  *ddr_a &= ~0b00000010;
+  *port_a &= ~0b00000010;
+  // Set off button as input
+  *ddr_a &= ~0b00000001;
+  *port_a &= ~0b00000001;
 
-*port_a |= 0b00000100;
+
+
 
 }
 
@@ -108,18 +126,19 @@ void loop() {
   }
 
   if (state == 3){
+    date();
     Serial.println("error");
-    Error(5);
+    Error(code);
   }
 
-  if (state >= 4){
-    state = 0;
-  }
+  if(*pin_a & 0b00000001){state = 0;}
 
 }
 
 void power(){
-  state = 1;
+  if (state == 0){state = 1;}
+  else{}
+  
   }
 
 void date(){
@@ -138,14 +157,21 @@ void date(){
   Serial.print(" -- ");
 }
 
+
 void Off(){
   //Turn light to red
   *port_a |=  0b00001000;
   *port_a &= ~0b00110000;
 
-  
+  //Turn off humidifier
 
-}
+  
+  *port_a |= 0b00000100;
+ 
+  humid_power = false;
+  }
+
+
 
 void Idle(){
   //Turn light to yellow
@@ -153,22 +179,13 @@ void Idle(){
   *port_a &= ~0b00011000;
 
 
-  delay(5000);
-  state += 1;
+
 
   //Turn off humidifier
 
-  if (humid_power == true){
+ 
   *port_a |= 0b00000100;
-  delay(100);
-  *port_a &= ~0b00000100;
-  delay(100);
-  *port_a |= 0b00000100;
-  delay(100);
-  *port_a &= ~0b00000100;
   
-  humid_power = false;
-  }
   
   //Read and update user input
   lcd.clear();
@@ -186,6 +203,9 @@ void Idle(){
   if (dht11.readHumidity() < (uInput)){
     state = 2;
   }
+
+  //Error Checking
+  if (dht11.readHumidity() >= 100){code = 1;state = 3;} // Error 1: Humidity Sensor not Functioning
   
 }
 
@@ -200,13 +220,10 @@ void On(){
   //Turn on humidifier
 
 
-  if (humid_power == false){
-  *port_a |= 0b00000100;
   
-  delay(500);
   *port_a &= ~0b00000100;
-  humid_power = true;
-  }
+  
+  
   date();
   Serial.print("Humidity: ");
   Serial.println(dht11.readHumidity());
@@ -222,54 +239,25 @@ void On(){
   if (dht11.readHumidity() > (uInput + 5)){
     state = 1;
   }
+
+  //Error Checking
+  if (dht11.readHumidity() >= 100){code = 1;state = 3;} // Error 1: Humidity Sensor not Functioning
 }
 
 void Error(int code){
   //Turn light to blinking red
-  for (int i = 0; i < code; i++){
-    
-    *port_a |=  0b00001000;
-    *port_a &= ~0b00110000;
-    delay(500);
-    *port_a &= ~0b00111000;
-    //my_delay(100);
-    delay(100);
   
+  *port_a |=  0b00001000;
+  *port_a &= ~0b00110000;
+
+  if (code == 1){lcd.clear();lcd.print("E01");date();Serial.println("E01: Humidity Sensor not Functioning");}
+
+  if (*pin_a & 0b00000010 ){state = 1;} //resets error state
+
+  
+    
   }
   
-  
-
-  //display error code
-}
-
-
-void my_delay(unsigned int freq)
-{
-  // calc period
-  double period = 1.0/double(freq);
-  // 50% duty cycle
-  double half_period = period/2;
-  // clock period def
-  double clk_period = 0.0000000625;
-  // calc ticks
-  unsigned int ticks = half_period/clk_period;
-  // stop the timer
-  *myTCCR1B &= 0xF8;
-  // set the counts
-  *myTCNT1 = 65536 - ticks; //check slide
-
-  * myTCCR1A = 0x0;
-  // start the timer
-  * myTCCR1B |= 0b00000001;
-  // wait for overflow
-  while((*myTIFR1 & 0x01)==0); 
-  // stop the timer
-  *myTCCR1B &= 0xF8;   
-  // reset TOV           
-  *myTIFR1 |= 0x01;
-  
-}
-
 void U0init(unsigned long U0baud)
 {
 //  Students are responsible for understanding
