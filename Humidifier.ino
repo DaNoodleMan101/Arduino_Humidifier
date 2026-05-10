@@ -14,6 +14,9 @@
 #include <RTClib.h> // RTC library by Adafruit
 #include <LiquidCrystal.h>
 
+#define RDA 0x80
+#define TBE 0x20  
+
 
 
 
@@ -25,13 +28,12 @@ volatile unsigned int  *myTCNT1  = (unsigned  int *) 0x84;
 volatile unsigned char *myTIFR1 =  (unsigned char *) 0x36;
 
 
-#define RDA 0x80
- #define TBE 0x20  
- volatile unsigned char *myUCSR0A = (unsigned char *)0x00C0;
- volatile unsigned char *myUCSR0B = (unsigned char *)0x00C1;
- volatile unsigned char *myUCSR0C = (unsigned char *)0x00C2;
- volatile unsigned int  *myUBRR0  = (unsigned int *) 0x00C4;
- volatile unsigned char *myUDR0   = (unsigned char *)0x00C6;
+
+volatile unsigned char *myUCSR0A = (unsigned char *)0x00C0;
+volatile unsigned char *myUCSR0B = (unsigned char *)0x00C1;
+volatile unsigned char *myUCSR0C = (unsigned char *)0x00C2;
+volatile unsigned int  *myUBRR0  = (unsigned int *) 0x00C4;
+volatile unsigned char *myUDR0   = (unsigned char *)0x00C6;
 
  
 volatile unsigned char* my_ADMUX = (unsigned char*) 0x7C;
@@ -112,31 +114,95 @@ void loop() {
   uInput = analogRead(0);
   //uInput = adc_read(0);
   uInput = map(uInput, 0, 1023, 0, 100);
+
+  unsigned char uInput1 = uInput / 10 + '0';
+  unsigned char uInputT = uInput % 10 + '0';
+
   date();
-  Serial.print("User Input: ");
-  Serial.println(uInput);
+  U0putchar('U');
+  U0putchar('s');
+  U0putchar('e');
+  U0putchar('r');
+  U0putchar(' ');
+  U0putchar('I');
+  U0putchar('n');
+  U0putchar('p');
+  U0putchar('u');
+  U0putchar('t');
+  U0putchar(':');
+  U0putchar(' ');
+  U0putchar(uInput1);
+  U0putchar(uInputT);
+  U0putchar('\n');
+
+  
+  //Serial.print("User Input: ");
+  //Serial.println(uInput);
 
   if (state == 0){
     date();
-    Serial.println("Off State");
+    //Serial.println("Off State");
+    U0putchar('O');
+    U0putchar('f');
+    U0putchar('f');
+    U0putchar(' ');
+    U0putchar('S');
+    U0putchar('t');
+    U0putchar('a');
+    U0putchar('t');
+    U0putchar('e');
+    U0putchar('\n');
+
     Off();
   }
 
   if (state == 1){
     date();
-    Serial.println("Idle State");
+    U0putchar('I');
+    U0putchar('d');
+    U0putchar('l');
+    U0putchar('e');
+    U0putchar(' ');
+    U0putchar('S');
+    U0putchar('t');
+    U0putchar('a');
+    U0putchar('t');
+    U0putchar('e');
+    U0putchar('\n');
+    //Serial.println("Idle State");
     Idle();
   }
 
   if (state == 2){
     date();
-    Serial.println("On State");
+    U0putchar('O');
+    U0putchar('n');
+    U0putchar(' ');
+    U0putchar('S');
+    U0putchar('t');
+    U0putchar('a');
+    U0putchar('t');
+    U0putchar('e');
+    U0putchar('\n');
+    //Serial.println("On State");
     On();
   }
 
   if (state == 3){
     date();
-    Serial.println("error");
+    U0putchar('E');
+    U0putchar('r');
+    U0putchar('r');
+    U0putchar('o');
+    U0putchar('r');
+    U0putchar(' ');
+    U0putchar('S');
+    U0putchar('t');
+    U0putchar('a');
+    U0putchar('t');
+    U0putchar('e');
+    U0putchar('\n');
+    //Serial.println("error");
     Error(code);
   }
 
@@ -152,20 +218,55 @@ void power(){
 
 void date(){
   DateTime now = rtc.now();
+  unsigned char month1 = now.month() /10 + '0';
+  unsigned char monthT = now.month() %10 + '0';
+  unsigned char day1 = now.day() /10 + '0';
+  unsigned char dayT = now.day() %10 + '0';
+  unsigned char year1 = now.year() /10 + '0';
+  unsigned char yearT = now.year() %10 + '0';
+  unsigned char hour1 = now.hour() /10 + '0';
+  unsigned char hourT = now.hour() %10 + '0';
+  unsigned char min1 = now.minute() /10 + '0';
+  unsigned char minT = now.minute() %10 + '0';
+  unsigned char sec1 = now.second() /10 + '0';
+  unsigned char secT = now.second() %10 + '0';
+
+  U0putchar(month1);
+  U0putchar(monthT);
+  U0putchar('/');
+  U0putchar(day1);
+  U0putchar(dayT);
+  U0putchar('/');
+  U0putchar(year1);
+  U0putchar(yearT);
+  U0putchar(' ');
+  U0putchar(hour1);
+  U0putchar(hourT);
+  U0putchar(':');
+  U0putchar(min1);
+  U0putchar(minT);
+  U0putchar(':');
+  U0putchar(sec1);
+  U0putchar(secT);
+  U0putchar(' ');
+  U0putchar('-');
+  U0putchar('-');
+  U0putchar(' ');
+
+ 
+  //Serial.print(now.month());
+  //Serial.print("/");
+  //Serial.print(now.day(), DEC);
+  //Serial.print("/");
+  //Serial.print(now.year(), DEC);
+  //Serial.print(" ");
+  //Serial.print(now.hour(), DEC);
+  //Serial.print(":");
+  //Serial.print(now.minute(), DEC);
+  //Serial.print(":");
+  //Serial.print(now.second(), DEC);
+  //Serial.print(" -- ");
   
-  
-  Serial.print(now.month());
-  Serial.print("/");
-  Serial.print(now.day(), DEC);
-  Serial.print("/");
-  Serial.print(now.year(), DEC);
-  Serial.print(" ");
-  Serial.print(now.hour(), DEC);
-  Serial.print(":");
-  Serial.print(now.minute(), DEC);
-  Serial.print(":");
-  Serial.print(now.second(), DEC);
-  Serial.print(" -- ");
 }
 
 
@@ -205,9 +306,26 @@ void Idle(){
   
 
   //Check humidity sensor
+  unsigned char humid1 = dht11.readHumidity() /10 + '0';
+  unsigned char humidT = dht11.readHumidity() %10 + '0';
   date();
-  Serial.print("Humidity: ");
-  Serial.println(dht11.readHumidity());
+  U0putchar('H');
+  U0putchar('u');
+  U0putchar('m');
+  U0putchar('i');
+  U0putchar('d');
+  U0putchar('i');
+  U0putchar('t');
+  U0putchar('y');
+  U0putchar(':');
+  U0putchar(' ');
+  U0putchar(humid1);
+  U0putchar(humidT);
+  U0putchar('%');
+  U0putchar('\n');
+
+  //Serial.print("Humidity: ");
+  //Serial.println(dht11.readHumidity());
   
   if (dht11.readHumidity() < (uInput)){
     state = 2;
@@ -233,9 +351,24 @@ void On(){
   *port_a &= ~0b00000100;
   
   
+  unsigned char humid1 = dht11.readHumidity() /10 + '0';
+  unsigned char humidT = dht11.readHumidity() %10 + '0';
   date();
-  Serial.print("Humidity: ");
-  Serial.println(dht11.readHumidity());
+  U0putchar('H');
+  U0putchar('u');
+  U0putchar('m');
+  U0putchar('i');
+  U0putchar('d');
+  U0putchar('i');
+  U0putchar('t');
+  U0putchar('y');
+  U0putchar(':');
+  U0putchar(' ');
+  U0putchar(humid1);
+  U0putchar(humidT);
+  U0putchar('%');
+  U0putchar('\n');
+
   //Read and update user input
   lcd.clear();
   lcd.setCursor(0, 0);
@@ -286,7 +419,50 @@ void Error(int code){
   //Turn off humidifier
   *port_a |= 0b00000100;
 
-  if (code == 1){lcd.clear();lcd.print("E01");date();Serial.println("E01: Humidity Sensor not Functioning");}
+  if (code == 1)
+  {lcd.clear();
+  lcd.print("E01");
+  date();
+  U0putchar('E');
+  U0putchar('0');
+  U0putchar('1');
+  U0putchar(':');
+  U0putchar(' ');
+  U0putchar('H');
+  U0putchar('u');
+  U0putchar('m');
+  U0putchar('i');
+  U0putchar('d');
+  U0putchar('i');
+  U0putchar('t');
+  U0putchar('y');
+  U0putchar(' ');
+  U0putchar('S');
+  U0putchar('e');
+  U0putchar('n');
+  U0putchar('s');
+  U0putchar('o');
+  U0putchar('r');
+  U0putchar(' ');
+  U0putchar('n');
+  U0putchar('o');
+  U0putchar('t');
+  U0putchar(' ');
+  U0putchar('F');
+  U0putchar('u');
+  U0putchar('n');
+  U0putchar('c');
+  U0putchar('t');
+  U0putchar('i');
+  U0putchar('o');
+  U0putchar('n');
+  U0putchar('i');
+  U0putchar('n');
+  U0putchar('g');
+  U0putchar('\n');
+
+  //Serial.println("E01: Humidity Sensor not Functioning");
+  }
 
   if (*pin_a & 0b00000010 ){state = 1;} //resets error state
 
@@ -306,37 +482,22 @@ void U0init(unsigned long U0baud)
  tbaud = (FCPU / 16 / U0baud - 1);
  // Same as (FCPU / (16 * U0baud)) - 1;
  *myUCSR0A = 0x20;
- *myUCSR0B = 0x18;
+ *myUCSR0B = 0b00001000;
  *myUCSR0C = 0x06;
  *myUBRR0  = tbaud;
 }
-//
-// Read USART0 RDA status bit and return non-zero true if set
-//
-unsigned char U0kbhit()
-{
-  return (*myUCSR0A & RDA);
-   
-  
-  
-}
-//
-// Read input character from USART0 input buffer
-//
-unsigned char U0getchar()
-{
-  return *myUDR0;
-  
-}
+
 //
 // Wait for USART0 (myUCSR0A) TBE to be set then write character to
 // transmit buffer
 //
 void U0putchar(unsigned char U0pdata)
 {
+  
   while((*myUCSR0A & TBE) == 0);
   *myUDR0 = U0pdata;
 }
+
 
 void adc_init() //write your code after each commented line and follow the instruction 
 {
