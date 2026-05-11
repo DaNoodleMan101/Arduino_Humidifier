@@ -8,8 +8,6 @@
 
 
 
-
-
 #include <DHT11.h> //DHT11 Humidity Sensor Library by Dhruba Saha
 #include <RTClib.h> // RTC library by Adafruit
 #include <LiquidCrystal.h>
@@ -17,31 +15,20 @@
 #define RDA 0x80
 #define TBE 0x20  
 
-
-
-
-volatile unsigned char *myTCCR1A = (unsigned char *) 0x80;
-volatile unsigned char *myTCCR1B = (unsigned char *) 0x81;
-volatile unsigned char *myTCCR1C = (unsigned char *) 0x82;
-volatile unsigned char *myTIMSK1 = (unsigned char *) 0x6F;
-volatile unsigned int  *myTCNT1  = (unsigned  int *) 0x84;
-volatile unsigned char *myTIFR1 =  (unsigned char *) 0x36;
-
-
-
+//Registers for Serial Communication
 volatile unsigned char *myUCSR0A = (unsigned char *)0x00C0;
 volatile unsigned char *myUCSR0B = (unsigned char *)0x00C1;
 volatile unsigned char *myUCSR0C = (unsigned char *)0x00C2;
 volatile unsigned int  *myUBRR0  = (unsigned int *) 0x00C4;
 volatile unsigned char *myUDR0   = (unsigned char *)0x00C6;
 
- 
+ //Registers for ADC
 volatile unsigned char* my_ADMUX = (unsigned char*) 0x7C;
 volatile unsigned char* my_ADCSRB = (unsigned char*) 0x7B;
 volatile unsigned char* my_ADCSRA = (unsigned char*) 0x7A;
 volatile unsigned int* my_ADC_DATA = (unsigned int*) 0x78;
 
-
+//Registers for GPIO
 volatile unsigned char* ddr_a = (unsigned char*) 0x21;
 volatile unsigned char* port_a = (unsigned char*) 0x22;
 volatile unsigned char* pin_a = (unsigned char*) 0x20;
@@ -52,20 +39,20 @@ volatile unsigned char* port_e = (unsigned char*) 0x2E;
 volatile unsigned char* pin_e = (unsigned char*) 0x2C;
 volatile unsigned char* port_f = (unsigned char*) 0x31;
 
-int state = 0;
-unsigned int uInput = 0;
-bool humid_power = false;
 
-int code = 0;
-int errorInit = 0;
-unsigned long PMillis = 0;
-int blinkCount = 0;
-bool ledState = 0;
+int state = 0; // Machine state
+unsigned int uInput = 0; //User pot input
+int code = 0; //Error Code
+int errorInit = 0; //Toggle for error init
+unsigned long PMillis = 0; //previous millis 
+int blinkCount = 0; // Counts blink for error state
+bool ledState = 0; //Stores LED state for error
 
+//DHT11 pin
 DHT11 dht11(28);
-
 RTC_DS3231 rtc;
 
+//LCD pins
 const int RS = 30, EN = 31, D4 = 35, D5 = 36, D6 = 37, D7 = 38;
 LiquidCrystal lcd(RS, EN, D4, D5, D6, D7);
 
@@ -73,11 +60,11 @@ LiquidCrystal lcd(RS, EN, D4, D5, D6, D7);
 
 void setup() {
 
-  U0init(9600);
+  U0init(9600); //Serial init
 
-  rtc.begin();
+  rtc.begin(); //Start RTC
 
-  adc_init();
+  adc_init(); //ADC init
 
   // set up the LCD's number of columns and rows:
   lcd.begin(16, 2);
@@ -88,10 +75,6 @@ void setup() {
   *port_e &= ~0b00010000;
   attachInterrupt(digitalPinToInterrupt(2), power, RISING);
   
-  // setup the ADC
-  //adc_init();
-  
-
   // Set Led to output
   *ddr_a |=  0b00111000;
   // Set humidifier to output
@@ -107,44 +90,15 @@ void setup() {
   *ddr_a &= ~0b00000001;
   *port_a &= ~0b00000001;
 
-
-
-
 }
 
 
 void loop() {
-  //uInput = analogRead(0);
-  uInput = adc_read(0);
-  uInput = map(uInput, 0, 1023, 0, 100);
-
-  unsigned char uInput1 = uInput / 10 + '0';
-  unsigned char uInputT = uInput % 10 + '0';
-
-  date();
-  U0putchar('U');
-  U0putchar('s');
-  U0putchar('e');
-  U0putchar('r');
-  U0putchar(' ');
-  U0putchar('I');
-  U0putchar('n');
-  U0putchar('p');
-  U0putchar('u');
-  U0putchar('t');
-  U0putchar(':');
-  U0putchar(' ');
-  U0putchar(uInput1);
-  U0putchar(uInputT);
-  U0putchar('\n');
-
   
-  //Serial.print("User Input: ");
-  //Serial.println(uInput);
-
-  if (state == 0){
+  //Off state
+  if (state == 0){ 
     date();
-    //Serial.println("Off State");
+    
     U0putchar('O');
     U0putchar('f');
     U0putchar('f');
@@ -159,6 +113,7 @@ void loop() {
     Off();
   }
 
+  //Idle state
   if (state == 1){
     date();
     U0putchar('I');
@@ -176,6 +131,7 @@ void loop() {
     Idle();
   }
 
+  //On state
   if (state == 2){
     date();
     U0putchar('O');
@@ -191,6 +147,7 @@ void loop() {
     On();
   }
 
+  //Off state
   if (state == 3){
     date();
     U0putchar('E');
@@ -213,20 +170,53 @@ void loop() {
 
 }
 
+// Power interrupt function
 void power(){
   if (state == 0){state = 1;}
   else{}
   
   }
 
+// Displays User input
+void User_Input(){
+
+  uInput = adc_read(0);
+  uInput = map(uInput, 0, 1023, 0, 100);
+
+  unsigned char uInput1 = uInput / 10 + '0';
+  unsigned char uInputT = uInput % 10 + '0';
+
+  date();
+  U0putchar('U');
+  U0putchar('s');
+  U0putchar('e');
+  U0putchar('r');
+  U0putchar(' ');
+  U0putchar('I');
+  U0putchar('n');
+  U0putchar('p');
+  U0putchar('u');
+  U0putchar('t');
+  U0putchar(':');
+  U0putchar(' ');
+  U0putchar(uInput1);
+  U0putchar(uInputT);
+  U0putchar('\n');
+}
+
+//Displays date and time 
 void date(){
   DateTime now = rtc.now();
+
+  //Converting date and time to char
   unsigned char month1 = now.month() /10 + '0';
   unsigned char monthT = now.month() %10 + '0';
   unsigned char day1 = now.day() /10 + '0';
   unsigned char dayT = now.day() %10 + '0';
-  unsigned char year1 = now.year() /10 + '0';
-  unsigned char yearT = now.year() %10 + '0';
+  unsigned char year1 = now.year() %10 + '0';
+  unsigned char yearTh = (now.year() / 1000) % 10 +'0';
+  unsigned char yearH = (now.year() / 100) % 10 + '0'; 
+  unsigned char yearT = (now.year() / 10) % 10 + '0'; 
   unsigned char hour1 = now.hour() /10 + '0';
   unsigned char hourT = now.hour() %10 + '0';
   unsigned char min1 = now.minute() /10 + '0';
@@ -234,14 +224,17 @@ void date(){
   unsigned char sec1 = now.second() /10 + '0';
   unsigned char secT = now.second() %10 + '0';
 
+  //Display date and time
   U0putchar(month1);
   U0putchar(monthT);
   U0putchar('/');
   U0putchar(day1);
   U0putchar(dayT);
   U0putchar('/');
-  U0putchar(year1);
+  U0putchar(yearTh);
+  U0putchar(yearH);
   U0putchar(yearT);
+  U0putchar(year1);
   U0putchar(' ');
   U0putchar(hour1);
   U0putchar(hourT);
@@ -255,60 +248,38 @@ void date(){
   U0putchar('-');
   U0putchar('-');
   U0putchar(' ');
-
- 
-  //Serial.print(now.month());
-  //Serial.print("/");
-  //Serial.print(now.day(), DEC);
-  //Serial.print("/");
-  //Serial.print(now.year(), DEC);
-  //Serial.print(" ");
-  //Serial.print(now.hour(), DEC);
-  //Serial.print(":");
-  //Serial.print(now.minute(), DEC);
-  //Serial.print(":");
-  //Serial.print(now.second(), DEC);
-  //Serial.print(" -- ");
   
 }
 
-
+//Off State
 void Off(){
   //Turn light to red
   *port_a |=  0b00001000;
   *port_a &= ~0b00110000;
 
   //Turn off humidifier
-
-  
   *port_a |= 0b00000100;
- 
-  humid_power = false;
-  }
+  
+}
 
-
-
+//Idle State
 void Idle(){
-  //Turn light to yellow
+  //Turn light to blue
   *port_a |=  0b00100000;
   *port_a &= ~0b00011000;
-
-
-
 
   //Turn off humidifier
   *port_a |= 0b00000100;
   
-  
   //Read and update user input
+  User_Input();
   lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print("Humidity: ");
   lcd.print(uInput);
   lcd.print("%");
   
-
-  //Check humidity sensor
+  //Check humidity sensor and display
   unsigned char humid1 = dht11.readHumidity() /10 + '0';
   unsigned char humidT = dht11.readHumidity() %10 + '0';
   date();
@@ -327,9 +298,7 @@ void Idle(){
   U0putchar('%');
   U0putchar('\n');
 
-  //Serial.print("Humidity: ");
-  //Serial.println(dht11.readHumidity());
-  
+  //Sees if Humidity is below desired level
   if (dht11.readHumidity() < (uInput)){
     state = 2;
   }
@@ -339,21 +308,16 @@ void Idle(){
   
 }
 
+// On state
 void On(){
   //Turn light to green
   *port_a |=  0b00010000;
   *port_a &= ~0b00101000;
 
-  
-  
-
   //Turn on humidifier
-
-
-  
   *port_a &= ~0b00000100;
   
-  
+  //Read and display humidity level
   unsigned char humid1 = dht11.readHumidity() /10 + '0';
   unsigned char humidT = dht11.readHumidity() %10 + '0';
   date();
@@ -373,6 +337,7 @@ void On(){
   U0putchar('\n');
 
   //Read and update user input
+  User_Input();
   lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print("Humidity: ");
@@ -380,7 +345,6 @@ void On(){
   lcd.print("%");
 
   //Check humidity sensor
-  
   if (dht11.readHumidity() > (uInput + 5)){
     state = 1;
   }
@@ -389,6 +353,7 @@ void On(){
   if (dht11.readHumidity() >= 100){code = 1;state = 3;errorInit = 1;} // Error 1: Humidity Sensor not Functioning
 }
 
+// Error State
 void Error(int code){
   //Turn light to blinking red
   if (errorInit == 1){
@@ -422,6 +387,7 @@ void Error(int code){
   //Turn off humidifier
   *port_a |= 0b00000100;
 
+  //Error code 01
   if (code == 1)
   {lcd.clear();
   lcd.print("E01");
@@ -463,23 +429,18 @@ void Error(int code){
   U0putchar('n');
   U0putchar('g');
   U0putchar('\n');
-
-  //Serial.println("E01: Humidity Sensor not Functioning");
   }
 
-  if (*pin_a & 0b00000010 ){state = 1;} //resets error state
+ if (*pin_a & 0b00000010 ){state = 1;} //resets error state
 
   
     
 }
-  
+
+// Serial init  
 void U0init(unsigned long U0baud)
 {
-//  Students are responsible for understanding
-//  this initialization code for the ATmega2560 USART0
-//  and will be expected to be able to intialize
-//  the USART in differrent modes.
-//
+
  unsigned long FCPU = 16000000;
  unsigned int tbaud;
  tbaud = (FCPU / 16 / U0baud - 1);
@@ -490,10 +451,7 @@ void U0init(unsigned long U0baud)
  *myUBRR0  = tbaud;
 }
 
-//
-// Wait for USART0 (myUCSR0A) TBE to be set then write character to
-// transmit buffer
-//
+// Serial Transmitt
 void U0putchar(unsigned char U0pdata)
 {
   
@@ -501,7 +459,7 @@ void U0putchar(unsigned char U0pdata)
   *myUDR0 = U0pdata;
 }
 
-
+//ADC init
 void adc_init() {
     // Enable ADC
     *my_ADCSRA |= 0b10000000;
@@ -523,6 +481,7 @@ void adc_init() {
     *my_ADMUX &= 0b11100000; // Clear channel bits
 }
 
+// Read ADC data
 unsigned int adc_read(unsigned char adc_channel_num) {
     // 1. Clear existing MUX bits (0-4 in ADMUX, 5 in ADCSRB)
     *my_ADMUX &= 0b11100000;
