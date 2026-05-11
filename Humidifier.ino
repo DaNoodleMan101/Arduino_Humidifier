@@ -50,6 +50,7 @@ volatile unsigned char *port_b =    (unsigned char *) 0x25;
 volatile unsigned char* ddr_e = (unsigned char*) 0x2D;
 volatile unsigned char* port_e = (unsigned char*) 0x2E;
 volatile unsigned char* pin_e = (unsigned char*) 0x2C;
+volatile unsigned char* port_f = (unsigned char*) 0x31;
 
 int state = 0;
 unsigned int uInput = 0;
@@ -75,6 +76,8 @@ void setup() {
   U0init(9600);
 
   rtc.begin();
+
+  adc_init();
 
   // set up the LCD's number of columns and rows:
   lcd.begin(16, 2);
@@ -111,8 +114,8 @@ void setup() {
 
 
 void loop() {
-  uInput = analogRead(0);
-  //uInput = adc_read(0);
+  //uInput = analogRead(0);
+  uInput = adc_read(0);
   uInput = map(uInput, 0, 1023, 0, 100);
 
   unsigned char uInput1 = uInput / 10 + '0';
@@ -499,74 +502,47 @@ void U0putchar(unsigned char U0pdata)
 }
 
 
-void adc_init() //write your code after each commented line and follow the instruction 
-{
-  // setup the A register
- // set bit 7 to 1 to enable the ADC 
- *my_ADCSRA |= 0b10000000;
+void adc_init() {
+    // Enable ADC
+    *my_ADCSRA |= 0b10000000;
 
- // clear bit 5 to 0 to disable the ADC trigger mode
+    // Disable Trigger & Interrupts
+    *my_ADCSRA &= 0b11011111;
+    *my_ADCSRA &= 0b11110111;
 
-*my_ADCSRA &= 0b11011111;
+    // Set Prescaler to 128 (111) for stable readings at 16MHz
+    *my_ADCSRA |= 0b00000111; 
 
- // clear bit 3 to 0 to disable the ADC interrupt 
+    // Setup ADCSRB: Clear MUX5 (Bit 3)
+    *my_ADCSRB &= 0b11110111;
 
- *my_ADCSRA &= 0b11110111;
-
- // clear bit 0-2 to 0 to set prescaler selection to slow reading
-
- *my_ADCSRA &= 0b11111000;
-
-  // setup the B register
-// clear bit 3 to 0 to reset the channel and gain bits
-
-*my_ADCSRB &= 0b11110111;
-
- // clear bit 2-0 to 0 to set free running mode
-
- *my_ADCSRB &= 0b11111000;
-
-  // setup the MUX Register
- // clear bit 7 to 0 for AVCC analog reference
-
- *my_ADMUX &= 0b01111111;
-
-// set bit 6 to 1 for AVCC analog reference
-
-*my_ADMUX |= 0b01000000;
-
-  // clear bit 5 to 0 for right adjust result
-
-  *my_ADMUX &= 0b11011111;
-
- // clear bit 4-0 to 0 to reset the channel and gain bits
-
- *my_ADMUX &= 0b11100000;
-
+    // Setup ADMUX: AVCC Ref (01), Right Adjust (0)
+    *my_ADMUX &= 0b01111111; 
+    *my_ADMUX |= 0b01000000;
+    *my_ADMUX &= 0b11011111; // Right adjust
+    *my_ADMUX &= 0b11100000; // Clear channel bits
 }
-unsigned int adc_read(unsigned char adc_channel_num) //work with channel 0
-{
-  // clear the channel selection bits (MUX 4:0)
- 
- *my_ADMUX &= 0b11100000;
 
-  // clear the channel selection bits (MUX 5) hint: it's not in the ADMUX register
+unsigned int adc_read(unsigned char adc_channel_num) {
+    // 1. Clear existing MUX bits (0-4 in ADMUX, 5 in ADCSRB)
+    *my_ADMUX &= 0b11100000;
+    *my_ADCSRB &= ~(1 << 3); // Clear MUX5
 
-*my_ADCSRB &= 0b11110111;
- 
-  // set the channel selection bits for channel 0
+    // 2. Set channel (Assuming channel 0-7 for this logic)
+    // If you wanted channel 0, doing nothing here is technically correct
+    *my_ADMUX |= (adc_channel_num & 0x07); 
+    
+    // If channel > 7, you would need to set MUX5 in ADCSRB
+    if(adc_channel_num > 7) {
+        *my_ADCSRB |= (1 << 3);
+    }
 
-  
- *my_ADMUX &= 0b11110000;
+    // 3. Start Conversion
+    *my_ADCSRA |= 0x40; 
 
-  // set bit 6 of ADCSRA to 1 to start a conversion
+    // 4. Wait for ADSC bit to clear
+    while((*my_ADCSRA & 0x40));
 
-  *my_ADCSRA |= 0b01000000; 
-
-  // wait for the conversion to complete
-  while((*my_ADCSRA & 0x40) != 0);
-  // return the result in the ADC data register and format the data based on right justification (check the lecture slide)
-  
-  unsigned int val = (*my_ADC_DATA & 0x03FF);
-  return val;
+    // 5. Return 10-bit result (Must read ADCL then ADCH)
+    return (*(volatile unsigned int*)0x78); 
 }
