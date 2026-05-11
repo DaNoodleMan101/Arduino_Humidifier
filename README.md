@@ -1,4 +1,4 @@
-# Arduino Controlled Humidifier
+# Arduino Controlled Humidifier (Group 17, Garrett McSweeney, Kevin Valadez Marquez)
 
 ## Overview
 
